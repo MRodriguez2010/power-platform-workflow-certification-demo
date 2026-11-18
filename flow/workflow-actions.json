@@ -1,0 +1,399 @@
+{
+  "Existing_intake": {
+    "type": "OpenApiConnection",
+    "runAfter": {},
+    "inputs": {
+      "parameters": {
+        "source": "__EXCEL_SOURCE__",
+        "drive": "__EXCEL_DRIVE__",
+        "file": "requests.xlsx",
+        "table": "CertificationRequests",
+        "dateTimeFormat": "ISO 8601"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+        "connectionName": "shared_excelonlinebusiness",
+        "operationId": "GetItems"
+      },
+      "authentication": {
+        "type": "Raw",
+        "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+      }
+    }
+  },
+  "Input_id_matches": {
+    "type": "Query",
+    "inputs": {
+      "from": "@body('Existing_intake')?['value']",
+      "where": "@equals(item()?['RequestId'],triggerBody()?['newId'])"
+    },
+    "runAfter": {
+      "Existing_intake": [
+        "Succeeded"
+      ]
+    }
+  },
+  "Save_new_intake": {
+    "type": "If",
+    "expression": {
+      "and": [
+        {
+          "not": {
+            "equals": [
+              "@trim(coalesce(triggerBody()?['newId'],''))",
+              ""
+            ]
+          }
+        },
+        {
+          "equals": [
+            "@length(body('Input_id_matches'))",
+            0
+          ]
+        }
+      ]
+    },
+    "actions": {
+      "Append_intake": {
+        "type": "OpenApiConnection",
+        "runAfter": {},
+        "inputs": {
+          "parameters": {
+            "source": "__EXCEL_SOURCE__",
+            "drive": "__EXCEL_DRIVE__",
+            "file": "requests.xlsx",
+            "table": "CertificationRequests",
+            "item/RequestId": "@triggerBody()?['newId']",
+            "item/Revision": 1,
+            "item/Kind": "Workflow",
+            "item/Submitter": "@coalesce(triggerBody()?['submitter'],'')",
+            "item/Division": "@coalesce(triggerBody()?['division'],'')",
+            "item/Department": "@coalesce(triggerBody()?['department'],'')",
+            "item/Description": "@coalesce(triggerBody()?['description'],'')",
+            "item/SelectedTools": "@coalesce(triggerBody()?['selectedTools'],'')",
+            "item/SubmittedDate": "@convertTimeZone(utcNow(),'UTC','Central Standard Time','yyyy-MM-dd')"
+          },
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+            "connectionName": "shared_excelonlinebusiness",
+            "operationId": "AddRowV2"
+          },
+          "authentication": {
+            "type": "Raw",
+            "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+          }
+        }
+      },
+      "Wait_for_Excel_visibility": {
+        "type": "Wait",
+        "inputs": {
+          "interval": {
+            "count": 30,
+            "unit": "Second"
+          }
+        },
+        "runAfter": {
+          "Append_intake": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "else": {
+      "actions": {}
+    },
+    "runAfter": {
+      "Input_id_matches": [
+        "Succeeded"
+      ]
+    }
+  },
+  "Existing_decisions": {
+    "type": "OpenApiConnection",
+    "runAfter": {
+      "Save_new_intake": [
+        "Succeeded"
+      ]
+    },
+    "inputs": {
+      "parameters": {
+        "source": "__EXCEL_SOURCE__",
+        "drive": "__EXCEL_DRIVE__",
+        "file": "decisions.xlsx",
+        "table": "CertifierResponses",
+        "dateTimeFormat": "ISO 8601"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+        "connectionName": "shared_excelonlinebusiness",
+        "operationId": "GetItems"
+      },
+      "authentication": {
+        "type": "Raw",
+        "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+      }
+    }
+  },
+  "Input_decision_matches": {
+    "type": "Query",
+    "inputs": {
+      "from": "@body('Existing_decisions')?['value']",
+      "where": "@and(equals(item()?['RequestId'],triggerBody()?['decisionFor']),equals(string(item()?['Revision']),'1'))"
+    },
+    "runAfter": {
+      "Existing_decisions": [
+        "Succeeded"
+      ]
+    }
+  },
+  "Save_certifier_response": {
+    "type": "If",
+    "expression": {
+      "and": [
+        {
+          "not": {
+            "equals": [
+              "@trim(coalesce(triggerBody()?['decisionFor'],''))",
+              ""
+            ]
+          }
+        },
+        {
+          "equals": [
+            "@length(body('Input_decision_matches'))",
+            0
+          ]
+        },
+        {
+          "equals": [
+            "@contains(createArray('Approve','Deny','Postpone'),coalesce(triggerBody()?['decision'],''))",
+            true
+          ]
+        }
+      ]
+    },
+    "actions": {
+      "Append_decision": {
+        "type": "OpenApiConnection",
+        "runAfter": {},
+        "inputs": {
+          "parameters": {
+            "source": "__EXCEL_SOURCE__",
+            "drive": "__EXCEL_DRIVE__",
+            "file": "decisions.xlsx",
+            "table": "CertifierResponses",
+            "item/DecisionId": "@guid()",
+            "item/RequestId": "@triggerBody()?['decisionFor']",
+            "item/Revision": 1,
+            "item/Decision": "@triggerBody()?['decision']",
+            "item/Certifier": "Demo Certifier",
+            "item/Reason": "@coalesce(triggerBody()?['reason'],'')"
+          },
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+            "connectionName": "shared_excelonlinebusiness",
+            "operationId": "AddRowV2"
+          },
+          "authentication": {
+            "type": "Raw",
+            "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+          }
+        }
+      },
+      "Wait_for_decision_visibility": {
+        "type": "Wait",
+        "inputs": {
+          "interval": {
+            "count": 30,
+            "unit": "Second"
+          }
+        },
+        "runAfter": {
+          "Append_decision": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "else": {
+      "actions": {}
+    },
+    "runAfter": {
+      "Input_decision_matches": [
+        "Succeeded"
+      ]
+    }
+  },
+  "Read_requests": {
+    "type": "OpenApiConnection",
+    "runAfter": {
+      "Save_certifier_response": [
+        "Succeeded"
+      ]
+    },
+    "inputs": {
+      "parameters": {
+        "source": "__EXCEL_SOURCE__",
+        "drive": "__EXCEL_DRIVE__",
+        "file": "requests.xlsx",
+        "table": "CertificationRequests",
+        "dateTimeFormat": "ISO 8601"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+        "connectionName": "shared_excelonlinebusiness",
+        "operationId": "GetItems"
+      },
+      "authentication": {
+        "type": "Raw",
+        "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+      }
+    }
+  },
+  "Read_decisions": {
+    "type": "OpenApiConnection",
+    "runAfter": {
+      "Read_requests": [
+        "Succeeded"
+      ]
+    },
+    "inputs": {
+      "parameters": {
+        "source": "__EXCEL_SOURCE__",
+        "drive": "__EXCEL_DRIVE__",
+        "file": "decisions.xlsx",
+        "table": "CertifierResponses",
+        "dateTimeFormat": "ISO 8601"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+        "connectionName": "shared_excelonlinebusiness",
+        "operationId": "GetItems"
+      },
+      "authentication": {
+        "type": "Raw",
+        "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+      }
+    }
+  },
+  "Requests_of_kind": {
+    "type": "Query",
+    "inputs": {
+      "from": "@body('Read_requests')?['value']",
+      "where": "@equals(item()?['Kind'], 'Workflow')"
+    },
+    "runAfter": {
+      "Read_decisions": [
+        "Succeeded"
+      ]
+    }
+  },
+  "For_each_request": {
+    "type": "Foreach",
+    "foreach": "@body('Requests_of_kind')",
+    "actions": {
+      "Same_revision": {
+        "type": "Query",
+        "inputs": {
+          "from": "@body('Read_requests')?['value']",
+          "where": "@and(equals(item()?['RequestId'],items('For_each_request')?['RequestId']),equals(string(item()?['Revision']),string(items('For_each_request')?['Revision'])))"
+        },
+        "runAfter": {}
+      },
+      "Newer_revision": {
+        "type": "Query",
+        "inputs": {
+          "from": "@body('Read_requests')?['value']",
+          "where": "@and(equals(item()?['RequestId'],items('For_each_request')?['RequestId']),greater(int(item()?['Revision']),int(items('For_each_request')?['Revision'])))"
+        },
+        "runAfter": {
+          "Same_revision": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Matching_decision": {
+        "type": "Query",
+        "inputs": {
+          "from": "@body('Read_decisions')?['value']",
+          "where": "@and(equals(item()?['RequestId'],items('For_each_request')?['RequestId']),equals(string(item()?['Revision']),string(items('For_each_request')?['Revision'])))"
+        },
+        "runAfter": {
+          "Newer_revision": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Qualification": {
+        "type": "Compose",
+        "inputs": "@if(or(empty(trim(string(items('For_each_request')?['RequestId']))),empty(trim(string(items('For_each_request')?['Kind']))),empty(trim(string(items('For_each_request')?['Submitter']))),empty(trim(string(items('For_each_request')?['Division']))),empty(trim(string(items('For_each_request')?['Department']))),empty(trim(string(items('For_each_request')?['Description'])))),'NeedsInformation',if(or(contains(split(coalesce(items('For_each_request')?['SelectedTools'],''),';'),'Demo Local File Tool'),contains(split(coalesce(items('For_each_request')?['SelectedTools'],''),';'),'Demo Unsupported Tool')),'LocalOnly',if(not(contains(createArray('Operations','Analytics'),items('For_each_request')?['Department'])),'NeedsInformation','PendingReview')))",
+        "runAfter": {
+          "Matching_decision": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Final_status": {
+        "type": "Compose",
+        "inputs": "@if(not(equals(length(body('Same_revision')),1)),'DuplicateRevision',if(greater(length(body('Newer_revision')),0),'StaleRevision',if(greater(length(body('Matching_decision')),1),'AmbiguousDecision',if(not(equals(outputs('Qualification'),'PendingReview')),outputs('Qualification'),if(equals(length(body('Matching_decision')),0),'PendingReview',if(equals(first(body('Matching_decision'))?['Decision'],'Approve'),'Approved',if(equals(first(body('Matching_decision'))?['Decision'],'Deny'),'Denied',if(equals(first(body('Matching_decision'))?['Decision'],'Postpone'),'Postponed','NeedsDecisionReview'))))))))",
+        "runAfter": {
+          "Qualification": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Result": {
+        "type": "Compose",
+        "inputs": {
+          "RequestId": "@items('For_each_request')?['RequestId']",
+          "Revision": "@items('For_each_request')?['Revision']",
+          "Kind": "Workflow",
+          "Status": "@outputs('Final_status')",
+          "RecertifyBy": "@if(equals(outputs('Qualification'),'PendingReview'),if(equals(items('For_each_request')?['Department'],'Operations'),concat(formatDateTime(items('For_each_request')?['SubmittedDate'],'yyyy'),'-12-31'),formatDateTime(addToTime(items('For_each_request')?['SubmittedDate'],12,'Month'),'yyyy-MM-dd')),'')",
+          "RoutePreview": "Demo Champs and external certifier only when eligible",
+          "Mode": "Synthetic reconstruction; no email sent"
+        },
+        "runAfter": {
+          "Final_status": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Write_receipt": {
+        "type": "OpenApiConnection",
+        "runAfter": {
+          "Result": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "parameters": {
+            "dataset": "__SHAREPOINT_SITE_URL__",
+            "folderPath": "/Shared Documents",
+            "name": "@concat('demo-workflow-',items('For_each_request')?['RequestId'],'-r',string(items('For_each_request')?['Revision']),'.json')",
+            "body": "@string(outputs('Result'))"
+          },
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "connectionName": "shared_sharepointonline",
+            "operationId": "CreateFile"
+          },
+          "authentication": {
+            "type": "Raw",
+            "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+          }
+        }
+      }
+    },
+    "runAfter": {
+      "Requests_of_kind": [
+        "Succeeded"
+      ]
+    },
+    "runtimeConfiguration": {
+      "concurrency": {
+        "repetitions": 1
+      }
+    }
+  }
+}

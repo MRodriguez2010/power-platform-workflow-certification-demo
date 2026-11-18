@@ -1,0 +1,60 @@
+{
+  "type": "object",
+  "required": [],
+  "properties": {
+    "newId": {
+      "type": "string",
+      "title": "New request ID (blank = process saved rows)",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "submitter": {
+      "type": "string",
+      "title": "Synthetic submitter",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "division": {
+      "type": "string",
+      "title": "Division",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "department": {
+      "type": "string",
+      "title": "Department: Operations or Analytics",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "description": {
+      "type": "string",
+      "title": "Workflow description",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "selectedTools": {
+      "type": "string",
+      "title": "Excluded tools, separated by semicolons",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "decisionFor": {
+      "type": "string",
+      "title": "Certifier response: request ID (optional)",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "decision": {
+      "type": "string",
+      "title": "Certifier decision: Approve, Deny, or Postpone",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    },
+    "reason": {
+      "type": "string",
+      "title": "Certifier reason",
+      "x-ms-content-hint": "TEXT",
+      "x-ms-dynamically-added": true
+    }
+  }
+}
